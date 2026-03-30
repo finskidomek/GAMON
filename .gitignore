@@ -1,0 +1,4 @@
+gamon
+*.o
+.vscode/
+.idea/

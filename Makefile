@@ -1,24 +1,36 @@
-# Konfiguracja
-CXX = clang++
+# 1. Inteligentne wykrywanie kompilatora
+# Szukamy clang++, jeśli nie ma - bierzemy g++
+CXX_BIN := $(shell command -v clang++ || echo g++)
+
+# 2. Nazwy plików
 TARGET = gamon
 SRC = gamon.cpp
 
-# Flagi: C++20 (dla filesystem), O3 (optymalizacja wydajnosci)
+# 3. Flagi i biblioteki
 CXXFLAGS = -std=c++20 -O3
 LIBS = -lsfml-graphics -lsfml-window -lsfml-system
 
-# Domyslna akcja: kompilacja przez distcc (uzywa Taty i Kryska)
+# --- AKCJE ---
+
+# Domyslna akcja: uzywa distcc TYLKO u Ciebie (jeśli masz distcc w systemie)
+# Jeśli ktos inny wpisze 'make', uzyje po prostu wykrytego kompilatora
 all:
-	distcc $(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS)
+	@echo "Sprawdzam kompilator: $(CXX_BIN)"
+	@if command -v distcc > /dev/null; then \
+		echo "Wykryto distcc! Kompilacja klastrowa..."; \
+		distcc $(CXX_BIN) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS); \
+	else \
+		echo "Brak distcc, kompilacja lokalna..."; \
+		$(CXX_BIN) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS); \
+	fi
 
-# Akcja lokalna: gdyby Krysiek byl wylaczony
+# Wymuszona kompilacja lokalna
 local:
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS)
+	@echo "Kompilacja lokalna za pomoca: $(CXX_BIN)"
+	$(CXX_BIN) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LIBS)
 
-# Czyszczenie
 clean:
 	rm -f $(TARGET)
 
-# Uruchomienie
 run: all
 	./$(TARGET)
