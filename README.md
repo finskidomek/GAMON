@@ -1,4 +1,4 @@
-# 🚀 GAMON v1.4 - Kinetic CPU Monitor for Gentoo
+# 🚀 GAMON v1.7.1 - Kinetic CPU Monitor for Gentoo
 **(Gentoo Advanced Monitoring Of Nodes)**
 
 **GAMON** to dynamiczny, oparty na fizyce monitor obciążenia procesora, stworzony specjalnie dla systemów **Gentoo Linux**. Każdy rdzeń Twojego CPU jest reprezentowany przez "gumowy" kwadrat, którego energia, prędkość i kolor zależą bezpośrednio od aktualnego obciążenia systemu.
@@ -20,7 +20,7 @@ Program powstał przy ścisłej współpracy:
 - **Efekt "Soft-Body"**: Kwadraty zachowują się jak gumowe obiekty – wibrują i odkształcają się przy zderzeniach.
 - **System Cząsteczek (Iskry)**: Każda kolizja generuje deszcz iskier, których ilość i rozmiar zależą od energii uderzenia (loadu).
 - **Płynna Paleta Barw**: Od zieleni (Idle 0%) przez żółty, aż po krwistą czerwień (Stress 100%).
-- **dodany argument lini komend mozna podac gamon xx temperatura alarmowa i zarazem zakres wysokiej temperatury  po ktorej pojawia sie alarm 
+- **dodany argument lini komend (mozna podac gamon xx temperatura alarmowa) jest to zarazem zakres wysokiej temperatury jak i po ktorej pojawia sie alarm 
 - **Dwa Tryby Pracy**:
 - `Klawisz 1`: Widok wszystkich rdzeni (Cores View).
 - `Klawisz 2`: Widok sumaryczny (Mega-Square View).
