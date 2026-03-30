@@ -21,8 +21,9 @@ Program powstał przy ścisłej współpracy:
 - **System Cząsteczek (Iskry)**: Każda kolizja generuje deszcz iskier, których ilość i rozmiar zależą od energii uderzenia (loadu).
 - **Płynna Paleta Barw**: Od zieleni (Idle 0%) przez żółty, aż po krwistą czerwień (Stress 100%).
 - **Dwa Tryby Pracy**:
-  - `Klawisz 1`: Widok wszystkich rdzeni (Cores Mode).
-  - `Klawisz 2`: Mega-Dashboard (Suma obciążenia całego CPU).
+- `Klawisz 1`: Widok wszystkich rdzeni (Cores View).
+- `Klawisz 2`: Widok sumaryczny (Mega-Square View).
+- `Klawisz 3`: PRZEŁĄCZNIK DANYCH (Toggle: Load % <-> Temp °C).
 - **Dane w czasie rzeczywistym**: Wyświetla MHz każdego rdzenia oraz temperaturę procesora (z `coretemp`).
 - **Screen Shake**: Drżenie ekranu przy potężnych uderzeniach w trybie Total (im większy load, tym mocniej trzęsie).
 
