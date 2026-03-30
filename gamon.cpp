@@ -8,7 +8,9 @@
 #include <iomanip>
 #include <filesystem>
 #include <thread>
+#include <algorithm>
 
+// --- STRUKTURY ---
 struct CPUState { long u, n, s, i; };
 struct Particle { sf::RectangleShape shape; sf::Vector2f velocity; float lifetime = 255.f; };
 struct Square {
@@ -18,6 +20,7 @@ struct Square {
     float squashTimer = 0.f; int id = -1;
 };
 
+// --- FUNKCJE SYSTEMOWE ---
 float getCoreMHz(int coreIdx) {
     std::ifstream file("/proc/cpuinfo"); std::string line; int currentCore = 0;
     while (std::getline(file, line)) {
@@ -82,15 +85,16 @@ void createSparks(std::vector<Particle>& particles, sf::Vector2f pos, sf::Color 
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    float alertThreshold = 80.0f;
+    if (argc > 1) { try { alertThreshold = std::stof(argv[1]); } catch (...) {} }
+
     const unsigned int W = 1100, H = 850;
-    sf::RenderWindow window(sf::VideoMode({W, H}), "GAMON 1.6 - Kinetic Hybrid Monitor");
+    sf::RenderWindow window(sf::VideoMode({W, H}), "GAMON 1.7.4 - Panic Alert");
     window.setFramerateLimit(60); std::srand(static_cast<unsigned>(std::time(nullptr)));
     sf::Font font; if (!font.openFromFile("/usr/share/fonts/liberation-fonts/LiberationMono-Bold.ttf")) return -1;
 
-    int viewMode = 1;      // 1: Cores, 2: Total
-    int dataSource = 1;    // 1: Load, 2: Temp (Przełączane klawiszem 3)
-
+    int viewMode = 1; int dataSource = 1;
     const int coreCount = std::thread::hardware_concurrency();
     std::vector<Square> coreSquares; Square totalSquare; std::vector<Particle> particles;
     CPUState globalLast = {0,0,0,0}; float screenShake = 0.f, pkgTemp = 0.f;
@@ -120,12 +124,9 @@ int main() {
         if (cpuClock.getElapsedTime().asMilliseconds() > 250) {
             pkgTemp = getPackageTemp();
             for (auto& s : coreSquares) {
-                s.currentLoad = getLoad(s.id, s.lastState);
-                s.currentMHz = getCoreMHz(s.id);
-                s.currentTemp = getCoreTemp(s.id);
+                s.currentLoad = getLoad(s.id, s.lastState); s.currentMHz = getCoreMHz(s.id); s.currentTemp = getCoreTemp(s.id);
             }
-            totalSquare.currentLoad = getLoad(-1, globalLast);
-            totalSquare.currentTemp = pkgTemp;
+            totalSquare.currentLoad = getLoad(-1, globalLast); totalSquare.currentTemp = pkgTemp;
             cpuClock.restart();
         }
 
@@ -134,34 +135,42 @@ int main() {
             window.setView(v); screenShake *= 0.92f; if (screenShake < 0.1f) { screenShake = 0; window.setView(defaultView); }
         }
 
-        for (auto it = particles.begin(); it != particles.end(); ) {
-            it->shape.move(it->velocity); it->lifetime -= 5.f;
-            if (it->lifetime <= 0) it = particles.erase(it);
-            else { sf::Color c = it->shape.getFillColor(); it->shape.setFillColor(sf::Color(c.r, c.g, c.b, (std::uint8_t)it->lifetime)); ++it; }
-        }
+        bool isOverheat = (pkgTemp > alertThreshold);
+        if (isOverheat) {
+            float pulse = std::sin(cpuClock.getElapsedTime().asSeconds() * 8.f) * 40.f + 40.f;
+            window.clear(sf::Color(static_cast<std::uint8_t>(pulse), 0, 0));
+        } else { window.clear(sf::Color::Black); }
 
-        window.clear(sf::Color::Black);
-        for (auto& p : particles) window.draw(p.shape);
+        for (auto& p : particles) {
+            p.shape.move(p.velocity); p.lifetime -= 5.f;
+            sf::Color c = p.shape.getFillColor(); p.shape.setFillColor(sf::Color(c.r, c.g, c.b, (std::uint8_t)p.lifetime));
+            window.draw(p.shape);
+        }
+        particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle& p){ return p.lifetime <= 0; }), particles.end());
 
         auto updateSquare = [&](Square& s) {
-            float f = (dataSource == 2) ? (s.currentTemp - 35.f) / 50.f : (s.currentLoad / 100.f);
+            float f = (dataSource == 2) ? (s.currentTemp - 30.f) / (alertThreshold - 30.f) : (s.currentLoad / 100.f);
             if (f < 0.f) f = 0.f; if (f > 1.f) f = 1.f;
             s.shape.move(s.velocity * (0.35f + f * 4.0f));
             s.shape.rotate(sf::degrees(f * 25.f));
-            std::uint8_t r = (std::uint8_t)(f < 0.5f ? (f * 510.f) : 255.f);
-            std::uint8_t g = (std::uint8_t)(f < 0.5f ? 255.f : (510.f - f * 510.f));
-            sf::Color col(r, g, 0); s.shape.setFillColor(col);
-            if (s.squashTimer > 0) {
-                s.squashTimer -= 0.04f; float wave = std::sin(s.squashTimer * 12.f) * s.squashTimer * f;
-                s.shape.setScale({1.0f + wave * 0.7f, 1.0f - wave * 0.7f});
-            } else s.shape.setScale({1.f, 1.f});
+
+            sf::Color col;
+            if (f < 0.2f) { float t = f / 0.2f; col = sf::Color(static_cast<uint8_t>(173 * (1 - t)), 216 + static_cast<uint8_t>(39 * t), 230); }
+            else if (f < 0.4f) { float t = (f - 0.2f) / 0.2f; col = sf::Color(0, 255, static_cast<uint8_t>(230 * (1 - t))); }
+            else if (f < 0.6f) { float t = (f - 0.4f) / 0.2f; col = sf::Color(static_cast<uint8_t>(255 * t), 255, 0); }
+            else if (f < 0.8f) { float t = (f - 0.6f) / 0.2f; col = sf::Color(255, static_cast<uint8_t>(255 - (127 * t)), 0); }
+            else { float t = (f - 0.8f) / 0.2f; col = sf::Color(255, static_cast<uint8_t>(128 - (128 * t)), 0); }
+            s.shape.setFillColor(col);
+
+            if (s.squashTimer > 0) { s.squashTimer -= 0.04f; float wave = std::sin(s.squashTimer * 12.f) * s.squashTimer * f; s.shape.setScale({1.0f + wave * 0.7f, 1.0f - wave * 0.7f}); }
+            else s.shape.setScale({1.f, 1.f});
+
             sf::Vector2f p = s.shape.getPosition(); float rad = (s.shape.getSize().x * s.shape.getScale().x) / 2.f;
-            bool hit = false;
-            if (p.x < rad) { s.shape.setPosition({rad, p.y}); s.velocity.x *= -1; hit = true; }
-            if (p.x > W-rad) { s.shape.setPosition({W-rad, p.y}); s.velocity.x *= -1; hit = true; }
-            if (p.y < rad) { s.shape.setPosition({p.x, rad}); s.velocity.y *= -1; hit = true; }
-            if (p.y > H-120-rad) { s.shape.setPosition({p.x, H-120-rad}); s.velocity.y *= -1; hit = true; }
-            if (hit) { s.squashTimer = 1.0f; createSparks(particles, s.shape.getPosition(), col, (f*100.f), (s.id == -1)); if(s.id == -1) screenShake = f * 8.0f; }
+            if (p.x < rad) { s.shape.setPosition({rad, p.y}); s.velocity.x *= -1; s.squashTimer = 1.0f; createSparks(particles, s.shape.getPosition(), col, (f*100.f), (s.id == -1)); }
+            if (p.x > W-rad) { s.shape.setPosition({W-rad, p.y}); s.velocity.x *= -1; s.squashTimer = 1.0f; createSparks(particles, s.shape.getPosition(), col, (f*100.f), (s.id == -1)); }
+            if (p.y < rad) { s.shape.setPosition({p.x, rad}); s.velocity.y *= -1; s.squashTimer = 1.0f; createSparks(particles, s.shape.getPosition(), col, (f*100.f), (s.id == -1)); }
+            if (p.y > H-120-rad) { s.shape.setPosition({p.x, H-120-rad}); s.velocity.y *= -1; s.squashTimer = 1.0f; createSparks(particles, s.shape.getPosition(), col, (f*100.f), (s.id == -1)); }
+            if (s.id == -1 && s.squashTimer > 0.9f) screenShake = f * 8.0f;
             return col;
         };
 
@@ -171,7 +180,9 @@ int main() {
                 for (size_t j = i + 1; j < coreSquares.size(); ++j) {
                     if (coreSquares[i].shape.getGlobalBounds().findIntersection(coreSquares[j].shape.getGlobalBounds())) {
                         std::swap(coreSquares[i].velocity, coreSquares[j].velocity);
-                        coreSquares[i].shape.move(coreSquares[i].velocity * 5.f);
+                        float totalE = (coreSquares[i].currentLoad + coreSquares[j].currentLoad) / 200.f;
+                        float power = 1.2f + totalE * 8.f;
+                        coreSquares[i].shape.move(coreSquares[i].velocity * power); coreSquares[j].shape.move(coreSquares[j].velocity * power);
                         coreSquares[i].squashTimer = 1.0f; coreSquares[j].squashTimer = 1.0f;
                         createSparks(particles, coreSquares[i].shape.getPosition(), sf::Color::White, 50, false);
                     }
@@ -182,25 +193,31 @@ int main() {
                 else ss << (int)coreSquares[i].currentLoad << "%\n" << (int)coreSquares[i].currentMHz << "M";
                 sf::Text t(font, ss.str(), (coreCount > 12 ? 10 : 14));
                 t.setOrigin({t.getLocalBounds().size.x / 2.f, t.getLocalBounds().size.y / 2.f + 5.f});
-                t.setPosition(coreSquares[i].shape.getPosition()); t.setFillColor(sf::Color::Black);
-                window.draw(t);
+                t.setPosition(coreSquares[i].shape.getPosition()); t.setFillColor(sf::Color::Black); window.draw(t);
             }
         } else {
             updateSquare(totalSquare); window.draw(totalSquare.shape);
             float avgM = 0; for(int i=0; i<coreCount; ++i) avgM += getCoreMHz(i);
             std::stringstream ss;
-            if (dataSource == 2) ss << " TOTAL TEMP\n  " << std::fixed << std::setprecision(1) << pkgTemp << "C\n " << (int)(avgM/coreCount) << "MHz\n  " << (int)totalSquare.currentLoad << "%";
-            else ss << " TOTAL LOAD\n  " << (int)totalSquare.currentLoad << "%\n " << (int)(avgM/coreCount) << "MHz\n  " << std::fixed << std::setprecision(1) << pkgTemp << "C";
+            if (dataSource == 2) ss << " MODE: TEMP\n  " << std::fixed << std::setprecision(1) << pkgTemp << "C\n " << (int)(avgM/coreCount) << "MHz\n  " << (int)totalSquare.currentLoad << "%";
+            else ss << " MODE: LOAD\n  " << (int)totalSquare.currentLoad << "%\n " << (int)(avgM/coreCount) << "MHz\n  " << std::fixed << std::setprecision(1) << pkgTemp << "C";
             sf::Text t(font, ss.str(), 32); t.setOrigin({t.getLocalBounds().size.x / 2.f, t.getLocalBounds().size.y / 2.f + 5.f});
-            t.setPosition(totalSquare.shape.getPosition()); t.setFillColor(sf::Color::Black);
-            window.draw(t);
+            t.setPosition(totalSquare.shape.getPosition()); t.setFillColor(sf::Color::Black); window.draw(t);
         }
 
-        std::string vStr = (viewMode == 1 ? "CORES" : "TOTAL");
-        std::string dStr = (dataSource == 1 ? "LOAD" : "TEMP");
-        sf::Text info(font, "VIEW: " + vStr + " | DATA: " + dStr + " | 1/2: VIEW | 3: TOGGLE DATA", 18);
-        info.setPosition({30.f, H - 75.f}); info.setFillColor(sf::Color::Cyan);
-        window.draw(info);
+        // WIELKI NAPIS ALARMOWY
+        if (isOverheat) {
+            sf::Text panic(font, "!!! ALARM: SYSTEM OVERHEAT !!!", 50);
+            panic.setFillColor(sf::Color::White);
+            sf::FloatRect b = panic.getLocalBounds();
+            panic.setOrigin({b.size.x/2.f, b.size.y/2.f});
+            panic.setPosition({W/2.f, H/2.f - 50.f});
+            // Efekt mrugania napisu
+            if ((int)(cpuClock.getElapsedTime().asMilliseconds() / 300) % 2 == 0) window.draw(panic);
+        }
+
+        sf::Text info(font, "MODE: " + std::string(dataSource == 1 ? "LOAD" : "TEMP") + " | PKG: " + std::to_string((int)pkgTemp) + "C | LIMIT: " + std::to_string((int)alertThreshold) + "C", 18);
+        info.setPosition({30.f, H - 75.f}); info.setFillColor(sf::Color::Cyan); window.draw(info);
         window.display();
     }
     return 0;

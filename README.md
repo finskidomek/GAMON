@@ -20,6 +20,7 @@ Program powstał przy ścisłej współpracy:
 - **Efekt "Soft-Body"**: Kwadraty zachowują się jak gumowe obiekty – wibrują i odkształcają się przy zderzeniach.
 - **System Cząsteczek (Iskry)**: Każda kolizja generuje deszcz iskier, których ilość i rozmiar zależą od energii uderzenia (loadu).
 - **Płynna Paleta Barw**: Od zieleni (Idle 0%) przez żółty, aż po krwistą czerwień (Stress 100%).
+- **dodany argument lini komend mozna podac gamon xx temperatura alarmowa i zarazem zakres wysokiej temperatury  po ktorej pojawia sie alarm 
 - **Dwa Tryby Pracy**:
 - `Klawisz 1`: Widok wszystkich rdzeni (Cores View).
 - `Klawisz 2`: Widok sumaryczny (Mega-Square View).
